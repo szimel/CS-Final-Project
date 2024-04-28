@@ -26,6 +26,7 @@ enum MenuOption {
   Quit = 6
 };
 
+// menu output function
 int displayMenu() {
   cout << "1. Add \n";
   cout << "2. Remove \n";
@@ -39,6 +40,41 @@ int displayMenu() {
   cin >> userChoice;
 
   return userChoice;
+}
+
+// this took forever to figure out - function that returns all students within student.dat
+// in the form of a dynamic array/pointer thing
+Student* getStudents(int& numStudents) {
+  Student* students = new Student[numStudents];
+
+  ifstream inFile("student.dat");
+  if (!inFile.is_open()) {
+    cout << "Error opening file.\n";
+    return nullptr;
+  }
+
+  for (int i = 0; i < numStudents; i++) {
+    string lastName, firstName;
+    getline(inFile, lastName, ',');
+    getline(inFile, firstName, ',');
+    students[i].name = lastName + "," + firstName;
+
+    inFile >> students[i].studentID;
+    inFile.ignore(); // Skip comma
+
+    inFile >> students[i].numTests;
+    inFile.ignore(); // Skip comma
+
+    students[i].testScores = new int[students[i].numTests];
+    for (int j = 0; j < students[i].numTests; j++) {
+      inFile >> students[i].testScores[j];
+      inFile.ignore(); // Skip comma
+    }
+  }
+
+  inFile.close();
+
+  return students;
 }
 
 // returns the number of students in the file
@@ -60,46 +96,24 @@ int getNumber() {
 }
 
 void removeStudent(int studentID) {
-  // Get number of students & create dynamic array
+  // call getStudents to get all data from student.dat
   int numStudents = getNumber();
-  Student* students = new Student[numStudents];
+  Student* students = getStudents(numStudents);
 
-  // Open file
-  ifstream inFile("student.dat");
-  if (!inFile.is_open()) {
-    cout << "Error opening file.\n";
+  if (!students) { // make sure it worked
+    cout << "Error getting students.\n";
     return;
   }
 
   bool found = false;
 
-  // map through the file and store the data in the array
+  // check if studentID is in the file
   for (int i = 0; i < numStudents; i++) {
-    // Read student data from file
-    string lastName, firstName;
-    getline(inFile, lastName, ',');
-    getline(inFile, firstName, ',');
-    students[i].name = lastName + "," + firstName; // set student name
-
-    inFile >> students[i].studentID;
-    inFile.ignore(); // ignore comma
-
-    inFile >> students[i].numTests;
-    inFile.ignore(); // ignore comma
-
-    students[i].testScores = new int[students[i].numTests];
-    for (int j = 0; j < students[i].numTests; j++) {
-      inFile >> students[i].testScores[j];
-      inFile.ignore(); // Skip comma
-    }
-
-    // Check if this is the student to remove
     if (students[i].studentID == studentID) {
       found = true;
+      break;
     }
   }
-
-  inFile.close();
 
   // if we found a match
   if (found) {
@@ -121,6 +135,8 @@ void removeStudent(int studentID) {
     }
 
     outFile.close();
+    cout << "Student removed.\n";
+
   } else {
     cout << "Student not found.\n";
   }
@@ -132,13 +148,121 @@ void removeStudent(int studentID) {
   delete[] students;// not sure if this line is needed
 }
 
+void display() {
+  // call getStudents to get all data from student.dat
+  int numStudents = getNumber();
+  Student* students = getStudents(numStudents);
+
+  if (!students) { // make sure it worked
+    cout << "Error getting students.\n";
+    return;
+  }
+
+  for (int i = 0; i < numStudents; i++) {
+    cout << setw(30) << left << students[i].name;
+    cout << setw(15) << students[i].studentID;
+    for (int j = 0; j < students[i].numTests; j++) {
+      cout << setw(5) << students[i].testScores[j];
+    }
+  }
+
+  // Delete dynamic array
+  for (int i = 0; i < numStudents; i++) {
+    delete[] students[i].testScores;
+  }
+  delete[] students;
+}
+
+void search(int studentID) {
+  // call getStudents to get all data from student.dat
+  int numStudents = getNumber();
+  Student* students = getStudents(numStudents);
+
+  if (!students) { // make sure it worked
+    cout << "Error getting students.\n";
+    return;
+  }
+
+  bool found = false;
+  for (int i = 0; i < numStudents; i++) {
+    if (students[i].studentID == studentID) {
+      found = true;
+      cout << setw(30) << left << students[i].name;
+      cout << setw(15) << students[i].studentID;
+      for (int j = 0; j < students[i].numTests; j++) {
+        cout << setw(5) << students[i].testScores[j];
+      }
+    }
+  }
+
+  if (!found) cout << "Student not found.\n";
+}
+
+int findMinimum(int* scores, int size) {
+  if (size < 5) {
+    return 0;
+  }
+
+  int minScore = scores[0];
+  for (int i = 1; i < size; i++) {
+    if (scores[i] < minScore) {
+      minScore = scores[i];
+    }
+  }
+
+  return minScore;
+}
+
+void exportResults() {
+  // open averages.dat file
+  ofstream outFile("averages.dat");
+  if (!outFile.is_open()) {
+    cout << "Error opening file averages.dat\n";
+    return;
+  }
+  // call getStudents to get all data from student.dat
+  int numStudents = getNumber();
+  Student* students = getStudents(numStudents);
+
+  if (!students) { // make sure it worked
+    cout << "Error getting students.\n";
+    return;
+  }
+
+  // calculate average score for each student
+  for (int i = 0; i < numStudents; i++) {
+    double total = 0;
+    int minScore = findMinimum(students[i].testScores, students[i].numTests);
+
+    // add up all test scores
+    for (int j = 0; j < students[i].numTests; j++) {
+      total += students[i].testScores[j];
+    }
+
+    // calculate average
+    total -= minScore;
+    double numTests = minScore == 0 ? students[i].numTests : students[i].numTests - 1; // don't drop if there are less than 5 tests
+    double average = total / numTests; 
+
+    outFile << students[i].studentID << " " << fixed << setprecision(1) << average << "\n";
+  }
+
+  outFile.close();
+
+  // Delete dynamic array
+  for (int i = 0; i < numStudents; i++) {
+    delete[] students[i].testScores;
+  }
+  delete[] students;
+}
+
 // adds a student to the student.dat file
 void addStudent() {
   // open student.dat file
   ofstream outFile;
   outFile.open("student.dat", ofstream::app);
   if(!outFile.is_open()) {
-    cout << "Error opening file.\n";
+    cout << "Error opening student.dat.\n";
     return;
   }
 
@@ -204,17 +328,17 @@ int main() {
       break;
     }
     case Display:
-      // display();
+      display();
       break;
     case Search: {
       int id;
       cout << "Enter the student ID to search for: ";
       cin >> id;
-      // search(id);
+      search(id);
       break;
     }
     case Results:
-      // exportResults();
+      exportResults();
       break;
     case Quit:
       cout << "Exiting the program.";
